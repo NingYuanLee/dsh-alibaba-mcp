@@ -1,0 +1,16 @@
+# dependencies
+node_modules/
+
+# npm publish artifacts
+*.tgz
+.npmrc
+npm-debug.log*
+
+# local editor / OS noise
+.DS_Store
+Thumbs.db
+*.bak
+*.bak-*
+
+# local test scratch
+.code_deploy/

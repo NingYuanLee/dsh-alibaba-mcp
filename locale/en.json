@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Alibaba Cloud Ops",
+    "description": "Connects the local alibaba-cloud-ops-mcp-server so the agent can operate Alibaba Cloud. Access keys stay in credentials and are not written into plugin config."
+  }
+}

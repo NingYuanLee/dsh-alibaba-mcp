@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "阿里云运维",
+    "description": "接入本机的 alibaba-cloud-ops-mcp-server，让助手操作阿里云资源。AccessKey 只保存在凭据里，不会写入插件配置。"
+  }
+}
