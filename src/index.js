@@ -14,10 +14,10 @@ import { apply as connectMcp, Config as McpConfig } from '@deepseek-ai/dsh-mcp-c
 import { credentialRef } from '@deepseek-ai/dsh-credentials'
 import z from '@deepseek-ai/schemastery'
 import { DEFAULT_COMMAND, TOOL_CALL_TIMEOUT_MS, buildLaunch, isFileCommand, redactSecrets } from './launch.js'
-import { DEFAULT_MODULES, MODULE_NAMES } from './modules.js'
+import { DEFAULT_MODULES, MODULE_NAMES, unwrapVolatile } from './modules.js'
 
 export { DEFAULT_COMMAND, TOOL_CALL_TIMEOUT_MS, buildLaunch, redactSecrets, MODULE_NAMES, DEFAULT_MODULES }
-export { resolveModules } from './modules.js'
+export { resolveModules, unwrapVolatile } from './modules.js'
 
 export const name = 'alibaba-mcp'
 export const inject = ['credentials', 'tools']
@@ -33,7 +33,11 @@ export const Config = z.object({
   cwd: z.string().default(''),
   serverName: z.string().pattern(SERVER_NAME).default('alibaba'),
   services: z.string().default(''),
-  modules: z.string().default(DEFAULT_MODULES),
+  // `volatile()` is what makes a field show up in the GUI settings form: the
+  // settings service only projects volatile fields (see volatileForm() in
+  // @deepseek-ai/dsh-settings). It also means a change hot-updates this plugin
+  // instead of reloading it, so apply() listens for loader/volatile-update.
+  modules: z.string().default(DEFAULT_MODULES).volatile(),
   cloudEnv: z.union([z.const('domestic'), z.const('international')]).default('domestic'),
   extraConfig: z.string().default(''),
   visibleTools: z.string().default(''),
@@ -52,9 +56,14 @@ export async function apply(ctx, config) {
   let generation = 0
   let fiber
   let queue = Promise.resolve()
+  let pending
 
   const stop = () => {
     generation += 1
+    if (pending !== undefined) {
+      clearTimeout(pending)
+      pending = undefined
+    }
     fiber?.dispose()
     fiber = undefined
   }
@@ -95,6 +104,10 @@ export async function apply(ctx, config) {
     }
     if (token !== generation) return
 
+    // `modules` is a volatile field, so the config holds a ref object rather
+    // than a string. Unwrap it here: passing the ref to buildLaunch would read
+    // as an empty value and silently restore the full 40-tool surface.
+    const modulesValue = unwrapVolatile(config.modules)
     const launch = buildLaunch({
       command: config.command,
       cwd: config.cwd,
@@ -110,7 +123,7 @@ export async function apply(ctx, config) {
       // codeDeploy picks its own seven-tool surface, so it must not collide
       // with the default modules value. An explicit modules choice other than
       // the default still wins and is reported as a conflict below.
-      modules: config.codeDeploy && config.modules === DEFAULT_MODULES ? 'all' : config.modules,
+      modules: config.codeDeploy && modulesValue === DEFAULT_MODULES ? 'all' : modulesValue,
     })
     if (!launch.ok) {
       if (launch.reason === 'partial') {
@@ -175,18 +188,32 @@ export async function apply(ctx, config) {
     return ((Date.now() - startedAt) / 1000).toFixed(1)
   }
 
-  function schedule() {
+  function scheduleNow() {
     const token = ++generation
     const run = queue.then(() => connect(token))
     queue = run.then(() => {}, () => {})
     return run
   }
 
+  // One save can emit several config events in a burst, and each one used to
+  // start another MCP child. Collapse the burst into one reconnect. The first
+  // connect stays immediate so apply() still reports readiness synchronously.
+  function scheduleDebounced() {
+    if (pending !== undefined) clearTimeout(pending)
+    pending = setTimeout(() => {
+      pending = undefined
+      void scheduleNow()
+    }, 500)
+  }
+
   ctx.on('credentials/reference-updated', (ref) => {
     if (!watched.has(String(ref))) return
-    void schedule()
+    scheduleDebounced()
   })
+  // A volatile field changed (the GUI saved `modules`): reconnect with the new
+  // tool whitelist instead of waiting for a restart.
+  ctx.on('loader/volatile-update', () => { scheduleDebounced() })
   ctx.effect(() => stop)
 
-  await schedule()
+  await scheduleNow()
 }

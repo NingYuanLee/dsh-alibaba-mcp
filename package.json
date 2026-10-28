@@ -1,6 +1,6 @@
 {
   "name": "dsh-alibaba-mcp",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Connect the local Alibaba Cloud Ops MCP server to DeepSeek Harness. Access keys stay in credentials and are passed only to that stdio process.",
   "license": "MIT",
   "author": "NingYuanLee <liyunningyuan@outlook.com>",
@@ -8,12 +8,15 @@
   "main": "src/index.js",
   "exports": {
     ".": "./src/index.js",
+    "./client": "./lib/client.js",
     "./locale/*.json": "./locale/*.json",
     "./icon": "./icon.svg",
     "./package.json": "./package.json"
   },
   "files": [
     "src",
+    "lib",
+    "scripts/build-client.mjs",
     "cordis.patch.yml",
     "locale",
     "icon.svg",
@@ -23,8 +26,10 @@
     "README*.md"
   ],
   "scripts": {
+    "build": "node scripts/build-client.mjs",
+    "prepack": "npm run build",
     "test": "node --test test/*.test.js",
-    "check": "node --check src/index.js && node --check src/launch.js"
+    "check": "node --check src/index.js && node --check src/launch.js && node --check src/client.js && node --check scripts/build-client.mjs"
   },
   "engines": {
     "node": ">=22.19.0",
@@ -48,6 +53,14 @@
     "manifestVersion": 1,
     "bundle": {
       "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-plugin-manager",
+        "@deepseek-ai/dsh-api-settings-controller"
+      ],
+      "platform": "web"
     }
   },
   "peerDependencies": {

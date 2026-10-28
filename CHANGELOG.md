@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.0
+
+- Add a client-side settings panel to the DSH plugin detail page, so the `modules` switch can be ticked in the GUI instead of edited in `cordis.patch.yml`. The panel reads and writes the plugin's settings namespace through the settings remote and the change is applied by the plugin manager.
+- The panel shows the startup cost per module (fast static modules vs the per-tool schema fetch of `ecs`/`vpc`/`rds`) and blocks saving when `codeDeploy` or `visibleTools` already owns the tool crop, because `modules` cannot take effect next to them.
+- Add `exports["./client"]` and `dsh.client` to the package manifest, plus `scripts/build-client.mjs`, which wraps `src/client.js` into the `window.__ModuleLoader__` factory the web client loads. No new runtime dependency: React comes from the host.
+- The client entry exports its cordis `inject` list (`slots`, `remote`, `remote.settings`, `locale`). Without that export the host never injects those services, `apply()` throws, and the entire web boot fails with `1 entry did not activate` — the bug that made 0.3.0 unloadable.
+- `modules` is now a **volatile** config field. `volatileForm()` in `@deepseek-ai/dsh-settings` only projects volatile fields, so this is what gives the plugin a settings namespace and an editable form at all; `apply()` also listens on `loader/volatile-update` and reconnects the MCP server with the new whitelist.
+- Keep the client module list covered by tests against `src/modules.js`, so a module the server accepts can never silently disappear from the picker.
+
 ## 0.2.0
 
 - Add a `modules` switch so the tool surface can be enabled per module instead of always loading all 40 tools. `modules` resolves to a `--visible-tools` whitelist.

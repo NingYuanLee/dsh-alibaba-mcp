@@ -75,6 +75,8 @@ Example profile override. A later patch replaces the whole `config` object, so r
 
 The Cordis row id is `alibaba-mcp`. The package name is `dsh-alibaba-mcp`.
 
+From 0.3.0 the plugin ships a client-side settings panel: open "Plugins → Alibaba Cloud Ops" in DSH, tick the modules you want, and saving writes the profile patch and reconnects the MCP, so the YAML edit is no longer required. The panel only offers the modules in the table above; when `codeDeploy` or `visibleTools` already trims the tool surface, it asks you to clear them first.
+
 ## Startup cost
 
 The server builds its tool surface at startup. Left alone it publishes 40 tools, and 11 of them are "dynamic API" tools whose schemas it fetches over HTTPS from `api.aliyun.com`. That is the slow part. `--services` does not help here: it only registers the common-API tools, so it can even grow the surface.

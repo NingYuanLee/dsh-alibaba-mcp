@@ -75,6 +75,8 @@ profile 覆盖示例。后写的补丁会整份替换 `config`，所以仍然需
 
 Cordis 行 id 是 `alibaba-mcp`。包名是 `dsh-alibaba-mcp`。
 
+从 0.3.0 起，插件自带客户端设置面板：在 DSH 的「插件 → 阿里云运维」详情页直接勾选模块，保存后会写回 profile 补丁并重连 MCP，不必手改 YAML。面板只列上表里的模块；如果 `codeDeploy` 或 `visibleTools` 已经占用了工具裁剪，面板会提示先清掉它们再保存。
+
 ## Startup cost
 
 服务器在启动时构建工具表。放任不管时它会发布 40 个工具，其中 11 个是“动态 API”工具，它们的 schema 要在启动时从 `api.aliyun.com` 走 HTTPS 拉取。慢的就是这一段。`--services` 帮不上忙：它只注册通用 API 工具，所以反而可能让工具数量变多。

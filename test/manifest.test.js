@@ -80,3 +80,39 @@ test('plugin source resolves credentials and does not embed a key', () => {
   assert.doesNotMatch(source, /LTAI[A-Za-z0-9]{8,}/u)
   assert.doesNotMatch(read('src/launch.js'), /LTAI[A-Za-z0-9]{8,}/u)
 })
+
+test('ships a web client entry for the module picker', () => {
+  assert.equal(pkg.exports?.['./client'], './lib/client.js')
+  assert.equal(pkg.dsh?.client?.platform, 'web')
+  for (const dep of ['@deepseek-ai/dsh-client-locale', '@deepseek-ai/dsh-client-ui-plugin-manager', '@deepseek-ai/dsh-api-settings-controller']) {
+    assert.ok(pkg.dsh.client.inject.includes(dep), `client inject includes ${dep}`)
+  }
+  assert.ok(pkg.files.includes('lib'), 'files includes lib')
+  assert.ok(pkg.files.includes('scripts/build-client.mjs'), 'files includes the build script')
+
+  // The built file is what the web client evaluates; a stale or unbundled copy
+  // would leave the detail page without the picker.
+  const built = read('lib/client.js')
+  assert.match(built, /window\.__ModuleLoader__\.load\(/)
+  assert.match(built, /id:\s*'dsh-alibaba-mcp'/)
+  assert.match(built, /createClient\(\{ React: require\('react'\) \}\)/)
+  assert.doesNotMatch(built, /^\s*export\b/mu)
+})
+
+test('client entry exports the cordis service list the web boot needs', () => {
+  // Without this export the host never injects ctx.slots/ctx.locale, apply()
+  // throws, and the whole web boot fails with "1 entry did not activate".
+  const source = read('src/client.js')
+  assert.match(source, /^export const inject = \[[^\]]*'slots'/mu)
+  assert.match(source, /^export const inject = \[[^\]]*'locale'/mu)
+  // The build must carry it onto the module exports, not just the source.
+  assert.match(read('lib/client.js'), /Object\.assign\(createClient\(\{ React: require\('react'\) \}\), \{ inject \}\)/)
+})
+
+test('the modules field is volatile so the GUI settings form can render it', () => {
+  // volatileForm() in @deepseek-ai/dsh-settings only projects volatile fields;
+  // without it the plugin has no settings namespace and the picker is read-only.
+  const source = read('src/index.js')
+  assert.match(source, /modules: z\.string\(\)\.default\(DEFAULT_MODULES\)\.volatile\(\)/u)
+  assert.match(source, /ctx\.on\('loader\/volatile-update'/u)
+})

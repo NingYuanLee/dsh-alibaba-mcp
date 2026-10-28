@@ -218,3 +218,30 @@ function untrimmed() {
 export function knownTools() {
   return new Set(Object.values(TOOLS_BY_MODULE).flat())
 }
+
+/**
+ * Unwrap a `.volatile()` config value.
+ *
+ * schemastery resolves a volatile field to the ref object `createVolatile()`
+ * returns, not to the raw value (`Schema.resolve`, volatile branch). Reading it
+ * as a plain string therefore fails: `typeof ref !== 'string'`, `resolveModules`
+ * sees an empty value, and the plugin silently falls back to the server's full
+ * 40-tool surface with no `--visible-tools` on the command line.
+ *
+ * The ref is also what makes a hot update visible: `loader/volatile-update`
+ * calls `updateVolatile(ref, source)`, so reading `ref.get()` at connect time
+ * always picks up the current GUI value.
+ *
+ * @param {unknown} value raw config value or volatile ref
+ * @returns {unknown} the underlying value, or the input when it is not a ref
+ */
+export function unwrapVolatile(value) {
+  if (value !== null && typeof value === 'object' && typeof value.get === 'function') {
+    try {
+      return value.get()
+    } catch {
+      return undefined
+    }
+  }
+  return value
+}

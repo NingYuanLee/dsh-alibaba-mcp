@@ -1,13 +1,40 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { DEFAULT_COMMAND, buildLaunch } from '../src/launch.js'
-import { DEFAULT_MODULES, MODULE_NAMES, knownTools, resolveModules } from '../src/modules.js'
+import { DEFAULT_MODULES, MODULE_NAMES, knownTools, resolveModules, unwrapVolatile } from '../src/modules.js'
 
 const toolCount = (modules) => {
   const resolved = resolveModules(modules)
   assert.equal(resolved.ok, true)
   return resolved.crop ? resolved.visibleTools.length : 40
 }
+
+test('volatile refs are unwrapped before they reach buildLaunch', () => {
+  // `.volatile()` resolves to createVolatile(value), so `config.modules` is a
+  // ref object. Passing it through unwrapped made resolveModules see an empty
+  // value and the server silently ran with all 40 tools and no --visible-tools.
+  assert.equal(unwrapVolatile('core,api'), 'core,api')
+  assert.equal(unwrapVolatile(undefined), undefined)
+  assert.equal(unwrapVolatile({ get: () => 'core,api,deploy' }), 'core,api,deploy')
+  assert.equal(unwrapVolatile({ get: () => { throw new Error('disposed') } }), undefined)
+
+  const ref = { get: () => 'core,api,deploy' }
+  const launch = buildLaunch({ command: DEFAULT_COMMAND, modules: unwrapVolatile(ref) })
+  assert.equal(launch.ok, true)
+  if (!launch.ok) return
+  assert.equal(launch.cropped, true)
+  assert.deepEqual(launch.modules, ['core', 'api', 'deploy'])
+  assert.equal(launch.visibleTools.length, 34)
+  assert.equal(launch.args.includes('--visible-tools'), true)
+  assert.equal(launch.args.includes('--services'), true)
+
+  // The regression this guards: an unwrapped ref must never degrade to "all".
+  const broken = buildLaunch({ command: DEFAULT_COMMAND, modules: ref })
+  assert.equal(broken.ok, true)
+  if (!broken.ok) return
+  assert.equal(broken.cropped, false)
+  assert.equal(broken.args.includes('--visible-tools'), false)
+})
 
 test('empty and all keep the server default surface', () => {
   for (const value of ['', '   ', 'all', 'ALL', undefined, null, 42]) {
