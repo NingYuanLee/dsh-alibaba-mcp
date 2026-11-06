@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.0
+
+- **Start the server through uv instead of a path baked into the package.** The previous default pointed at `D:\tools\mcp\vendor\alibaba\.venv\Scripts\alibaba-cloud-ops-mcp-server.exe`, a directory on one machine. Renaming it, rebuilding the venv, or installing the plugin anywhere else left the plugin unable to connect, and the failure was silent: `isFileCommand()` only checked that the value was an absolute path, so the test suite stayed green while the plugin could not start. The default `command` is now `uv`, which runs the `alibaba-cloud-ops-mcp-server` distribution from PyPI.
+- Pin the interpreter to Python 3.12 (`python` setting). uv otherwise picks the newest interpreter it finds, and on CPython 3.14 the `pydantic-core` build fails because its PyO3 bindings support at most 3.13.
+- Check that `uv` is on `PATH` before connecting and report the missing prerequisite with the official install command, instead of letting the spawn fail with a bare `ENOENT`. The plugin does not install anything itself.
+- `command` still accepts an absolute path, so an existing local venv keeps working; such a command takes no distribution prefix.
+
 ## 0.3.2
 
 - Widen `engines.dsh` to `>=0.2.1-rc.2 <0.3.0-0 || >=0.2.2-0 <0.3.0-0` so the declared host range admits the DSH 0.2.2 pre-release line this plugin is verified on. The previous single-clause range excluded 0.2.2 pre-releases even though the peer ranges already accepted them.

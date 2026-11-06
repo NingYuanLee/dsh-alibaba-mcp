@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { DEFAULT_COMMAND, buildLaunch } from '../src/launch.js'
+import { DEFAULT_COMMAND, UV_PREFIX_ARGS, buildLaunch } from '../src/launch.js'
 import { DEFAULT_MODULES, MODULE_NAMES, knownTools, resolveModules, unwrapVolatile } from '../src/modules.js'
 
 const toolCount = (modules) => {
@@ -100,7 +100,7 @@ test('code deploy keeps the dedicated flag and stays exclusive with modules', ()
   const deploy = buildLaunch({ command: DEFAULT_COMMAND, codeDeploy: true })
   assert.equal(deploy.ok, true)
   if (!deploy.ok) return
-  assert.deepEqual(deploy.args, ['--transport', 'stdio', '--code-deploy'])
+  assert.deepEqual(deploy.args, [...UV_PREFIX_ARGS, '--transport', 'stdio', '--code-deploy'])
   assert.equal(deploy.cropped, false)
 
   const viaModule = buildLaunch({ command: DEFAULT_COMMAND, modules: 'deploy' })
@@ -123,7 +123,7 @@ test('modules and an explicit visibleTools list are exclusive', () => {
   const explicitOnly = buildLaunch({ command: DEFAULT_COMMAND, visibleTools: 'OSS_ListBuckets' })
   assert.equal(explicitOnly.ok, true)
   if (!explicitOnly.ok) return
-  assert.deepEqual(explicitOnly.args, ['--transport', 'stdio', '--visible-tools', 'OSS_ListBuckets'])
+  assert.deepEqual(explicitOnly.args, [...UV_PREFIX_ARGS, '--transport', 'stdio', '--visible-tools', 'OSS_ListBuckets'])
 })
 
 test('an explicit services value overrides the api module default', () => {
@@ -131,6 +131,7 @@ test('an explicit services value overrides the api module default', () => {
   assert.equal(launch.ok, true)
   if (!launch.ok) return
   assert.deepEqual(launch.args, [
+    ...UV_PREFIX_ARGS,
     '--transport', 'stdio',
     '--services', 'oss',
     '--visible-tools', 'PromptUnderstanding,ListAPIs,GetAPIInfo,CommonAPICaller',

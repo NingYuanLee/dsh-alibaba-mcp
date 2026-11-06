@@ -10,10 +10,11 @@
  * credential write disposes the client and connects again.
  */
 import { access } from 'node:fs/promises'
+import { join } from 'node:path'
 import { apply as connectMcp, Config as McpConfig } from '@deepseek-ai/dsh-mcp-client'
 import { credentialRef } from '@deepseek-ai/dsh-credentials'
 import z from '@deepseek-ai/schemastery'
-import { DEFAULT_COMMAND, TOOL_CALL_TIMEOUT_MS, buildLaunch, isFileCommand, redactSecrets } from './launch.js'
+import { DEFAULT_COMMAND, DEFAULT_PYTHON, TOOL_CALL_TIMEOUT_MS, buildLaunch, isFileCommand, redactSecrets, usesUv } from './launch.js'
 import { DEFAULT_MODULES, MODULE_NAMES, unwrapVolatile } from './modules.js'
 
 export { DEFAULT_COMMAND, TOOL_CALL_TIMEOUT_MS, buildLaunch, redactSecrets, MODULE_NAMES, DEFAULT_MODULES }
@@ -30,6 +31,9 @@ export const Config = z.object({
   securityTokenEnv: z.string().role('credential-ref').default('ALIBABA_CLOUD_SECURITY_TOKEN'),
   regionEnv: z.string().role('credential-ref').default('ALIBABA_CLOUD_REGION_ID'),
   command: z.string().default(DEFAULT_COMMAND),
+  // Interpreter used to run the server. Pinned because uv would otherwise pick
+  // the newest Python it finds, and 3.14 breaks the pydantic-core build.
+  python: z.string().default(DEFAULT_PYTHON),
   cwd: z.string().default(''),
   serverName: z.string().pattern(SERVER_NAME).default('alibaba'),
   services: z.string().default(''),
@@ -110,6 +114,7 @@ export async function apply(ctx, config) {
     const modulesValue = unwrapVolatile(config.modules)
     const launch = buildLaunch({
       command: config.command,
+      python: config.python,
       cwd: config.cwd,
       accessKeyId,
       accessKeySecret,
@@ -144,6 +149,15 @@ export async function apply(ctx, config) {
         await access(launch.command)
       } catch {
         ctx.logger.error(`阿里云 MCP 未连接：找不到启动程序 ${launch.command}`)
+        return
+      }
+    } else if (usesUv(launch.command)) {
+      // uv is a bare name, so it is looked up on PATH. Report the missing
+      // prerequisite with the official install command instead of letting the
+      // spawn fail with a bare ENOENT.
+      const found = await findOnPath(launch.command)
+      if (!found) {
+        ctx.logger.error(`阿里云 MCP 未连接：PATH 上找不到 ${launch.command}。请先安装 uv：https://docs.astral.sh/uv/getting-started/installation/（Windows 可用 winget install --id=astral-sh.uv -e）。`)
         return
       }
     }
@@ -216,4 +230,33 @@ export async function apply(ctx, config) {
   ctx.effect(() => stop)
 
   await scheduleNow()
+}
+
+/**
+ * Look a bare executable name up on PATH.
+ *
+ * uv is normally installed as a bare name, so it cannot be stat'ed the way an
+ * absolute path can. This mirrors what the spawn would do, without spawning.
+ *
+ * @param {string} name executable name, without a directory part
+ * @returns {Promise<boolean>} whether the executable was found
+ */
+async function findOnPath(name) {
+  const path = process.env.PATH ?? ''
+  const separator = process.platform === 'win32' ? ';' : ':'
+  const extensions = process.platform === 'win32'
+    ? (process.env.PATHEXT ?? '.EXE;.CMD;.BAT;.COM').split(';')
+    : ['']
+  for (const dir of path.split(separator)) {
+    if (!dir) continue
+    for (const extension of extensions) {
+      try {
+        await access(join(dir, name + extension))
+        return true
+      } catch {
+        // Not here; try the next directory.
+      }
+    }
+  }
+  return false
 }

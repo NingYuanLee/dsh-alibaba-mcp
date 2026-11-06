@@ -10,7 +10,7 @@
 
 ## What it does
 
-助手调用的是已经装在 `D:\tools\mcp\vendor\alibaba` 里的服务。插件不会再下载一份，也不会跑 `uvx`。它用 stdio 启动该虚拟环境里的 `alibaba-cloud-ops-mcp-server.exe`，再把连接交给 `@deepseek-ai/dsh-mcp-client`。
+助手通过 [uv](https://docs.astral.sh/uv/) 调用阿里云运维 MCP 服务。插件不打包这个服务，也不依赖本机的某个目录：它从 PyPI 运行 `alibaba-cloud-ops-mcp-server`，再把连接交给 `@deepseek-ai/dsh-mcp-client`。
 
 AccessKey 从 DSH 凭据库读取，只放进子进程的环境变量，不会写入 `cordis.patch.yml`。MCP 客户端会清掉父进程里看起来像密钥的变量，所以只放在父进程环境里的值到不了子进程。
 
@@ -20,7 +20,7 @@ AccessKey 从 DSH 凭据库读取，只放进子进程的环境变量，不会�
 
 1. 用 `ctx.credentials` 解析 `accessKeyIdEnv` 和 `accessKeySecretEnv`（默认 `ALIBABA_CLOUD_ACCESS_KEY_ID` 和 `ALIBABA_CLOUD_ACCESS_KEY_SECRET`）。凭据库优先于进程环境变量。可选的 `securityTokenEnv` 和 `regionEnv` 走同一条路径。
 2. 密钥只配了一半，或只配了 SecurityToken 而没有成对密钥时，不启动。同时打开两种裁剪方式时也不启动：`codeDeploy`、`visibleTools`、以及 `modules` 取 `all` 以外的值，三者互斥。
-3. 用 `--transport stdio` 和选中的服务参数启动 `command`。`cwd` 有值时用它，否则用 `command` 所在目录。
+3. 用 `--transport stdio` 和选中的服务参数启动 `command`。`cwd` 有值时用它，否则用 `command` 所在目录；`command` 是靠 `PATH` 查找的裸名时用当前目录。
 4. 挂一个 `@deepseek-ai/dsh-mcp-client` 子插件。工具名、参数和结果都来自服务器，本包不重写这些工具。
 5. 四个凭据名之一发出 `credentials/reference-updated` 时，拆掉该子插件再连一次。
 
@@ -41,7 +41,20 @@ dsh plugin --profile web add dsh-alibaba-mcp
 
 `ALIBABA_CLOUD_SECURITY_TOKEN` 和 `ALIBABA_CLOUD_REGION_ID` 可选。
 
-默认 `command` 是 `D:\tools\mcp\vendor\alibaba\.venv` 里的控制台脚本（包 `alibaba-cloud-ops-mcp-server` 0.9.27）。换机器时把 `command` 改成那台机器上的脚本。
+### 前置条件
+
+服务是 Python 发行包，所以通过 [uv](https://docs.astral.sh/uv/getting-started/installation/) 启动。先装一次 uv：
+
+```bash
+# Windows
+winget install --id=astral-sh.uv -e
+# macOS / Linux
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+插件连接前会检查 `uv` 是否存在，缺失时明确报出这个前置条件，而不是抛一个 spawn 错误。插件自己不会安装任何东西。
+
+Python 版本固定为 **3.12**（`python` 设置项）。这不是随意选的：uv 默认会选它能找到的最新解释器，而在 CPython 3.14 上 `pydantic-core` 编译失败——它的 PyO3 绑定最高只支持 3.13。看到这个编译错误就说明机器默认解释器太新，uv 首次运行会自己下载一个托管的 3.12。
 
 ## Configuration
 
@@ -51,8 +64,9 @@ dsh plugin --profile web add dsh-alibaba-mcp
 | `accessKeySecretEnv` | `ALIBABA_CLOUD_ACCESS_KEY_SECRET` | AccessKey Secret 的凭据引用。 |
 | `securityTokenEnv` | `ALIBABA_CLOUD_SECURITY_TOKEN` | 可选的 STS Token 引用。空值忽略。没有成对密钥时即使有 Token 也不连接。 |
 | `regionEnv` | `ALIBABA_CLOUD_REGION_ID` | 可选的地域引用。空值忽略。 |
-| `command` | 虚拟环境中的 `alibaba-cloud-ops-mcp-server.exe` | stdio 可执行文件。绝对路径会在启动前检查是否存在。 |
-| `cwd` | `command` 所在目录 | 子进程工作目录。做代码部署时把它设成项目根目录。 |
+| `command` | `uv` | stdio 启动器。默认通过 uv 跑服务；裸名在 `PATH` 上查找。绝对路径直接使用，并在启动前检查是否存在。 |
+| `python` | `3.12` | 传给 uv 的 `--python` 解释器版本。固定版本是因为 uv 默认选最新解释器，而 CPython 3.14 会让 `pydantic-core` 编译失败。 |
+| `cwd` | `command` 所在目录 | 子进程工作目录。做代码部署时把它设成项目根目录。裸名命令留空。 |
 | `serverName` | `alibaba` | 工具名前缀：`mcp__<serverName>__<tool>`。必须匹配 `[A-Za-z0-9_-]{1,32}`，且在同一作用域的 MCP 客户端里唯一。 |
 | `services` | 空 | 逗号分隔的服务列表，传给 `--services`。空则沿用服务器默认。注意它**不减少**工具数量：服务器只用它注册通用 API 工具，所以它甚至可能增加工具。 |
 | `modules` | `core,api,deploy` | 逗号分隔的模块开关。默认只请求启动时不需要联网的工具（34 个，约 3 秒）。`all` 恢复服务器全量 40 个工具。任何取值都会转成 `--visible-tools` 白名单。模块：`core`、`api`、`deploy`、`oss`、`oos`、`cms`、`local`、`ecs`、`vpc`、`rds`。与 `visibleTools`、`codeDeploy` 互斥。 |
@@ -68,7 +82,7 @@ profile 覆盖示例。后写的补丁会整份替换 `config`，所以仍然需
 - id: alibaba-mcp
   config:
     serverName: alibaba
-    command: D:\tools\mcp\vendor\alibaba\.venv\Scripts\alibaba-cloud-ops-mcp-server.exe
+    python: '3.12'
     cloudEnv: domestic
 ```
 
@@ -115,7 +129,7 @@ Cordis 行 id 是 `alibaba-mcp`。包名是 `dsh-alibaba-mcp`。
 | dsh | `>=0.2.1-rc.2 <0.3.0-0 \|\| >=0.2.2-0 <0.3.0-0` |
 | Node | `>=22.19.0` |
 | 已验证 | dsh `0.2.2-rc.1` |
-| 服务器 | `D:\tools\mcp\vendor\alibaba` 里的 `alibaba-cloud-ops-mcp-server` 0.9.27 |
+| 服务器 | 来自 PyPI 的 `alibaba-cloud-ops-mcp-server` 0.9.27，通过 uv 启动 |
 | 依赖 | `credentials`、`tools`，以及自带的 `@deepseek-ai/dsh-mcp-client` |
 
 显示元数据是 `locale/en.json`、`locale/zh.json` 和 `icon.svg`。没有 Web UI，也没有构建步骤。
@@ -126,11 +140,17 @@ Cordis 行 id 是 `alibaba-mcp`。包名是 `dsh-alibaba-mcp`。
 dsh plugin --profile <name> remove dsh-alibaba-mcp
 ```
 
-卸掉插件会停掉子进程并注销它的工具。不会删除 AccessKey 凭据，也不会删除虚拟环境。本包除此之外不在磁盘上保存别的东西。
+卸掉插件会停掉子进程并注销它的工具。不会删除 AccessKey 凭据。服务本身留在 uv 的缓存里，由 uv 自己按规则清理。
 
 ## Troubleshooting
 
-**看不到 `mcp__alibaba__*`。** `command` 路径不对、密钥只配了一半，或别的 MCP 客户端已经占用了 `serverName` `alibaba`。插件日志会说明是哪一种，并且不打印密钥。
+**看不到 `mcp__alibaba__*`。** `PATH` 上没有 `uv`、密钥只配了一半，或别的 MCP 客户端已经占用了 `serverName` `alibaba`。插件日志会说明是哪一种，并且不打印密钥。
+
+**`PATH 上找不到 uv`。** 装好 uv 后重新打开 DeepSeek Harness，让新的 `PATH` 生效：Windows 用 `winget install --id=astral-sh.uv -e`，其他平台用 `curl -LsSf https://astral.sh/uv/install.sh | sh`。
+
+**`Failed to build pydantic-core`。** 机器默认的 Python 比 3.13 新，`pydantic-core` 没有对应的 wheel。插件因此固定了 `--python 3.12`；如果仍然编译失败，说明 uv 没能取到托管的 3.12，请检查网络，或把 `python` 设成机器上已存在的解释器。
+
+**第一次连接比较慢。** uv 首次使用会下载服务本身和它的 74 个依赖，之后就走缓存了。
 
 **服务起来了，但云调用失败。** 子进程的凭据链里没有可用密钥。把一对 AccessKey 存进凭据，等待重新连接。
 
