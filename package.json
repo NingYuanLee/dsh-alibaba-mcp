@@ -3,6 +3,10 @@
   "version": "0.3.2",
   "description": "Connect the local Alibaba Cloud Ops MCP server to DeepSeek Harness. Access keys stay in credentials and are passed only to that stdio process.",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/NingYuanLee/dsh-alibaba-mcp.git"
+  },
   "author": "NingYuanLee <liyunningyuan@outlook.com>",
   "type": "module",
   "main": "src/index.js",

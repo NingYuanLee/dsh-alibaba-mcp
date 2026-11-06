@@ -16,7 +16,10 @@ test('declares an installable bundle', () => {
   assert.equal(pkg.name, 'dsh-alibaba-mcp')
   assert.equal(pkg.dsh?.manifestVersion, 1)
   assert.equal(pkg.dsh?.bundle?.patch, './cordis.patch.yml')
-  assert.equal(pkg.repository, undefined)
+  // npm verifies the provenance bundle against this field, so it has to name
+  // the repository the release workflow runs from.
+  assert.equal(pkg.repository?.type, 'git')
+  assert.equal(pkg.repository?.url, 'git+https://github.com/NingYuanLee/dsh-alibaba-mcp.git')
   const patch = read('cordis.patch.yml')
   assert.match(patch, /id:\s*alibaba-mcp/)
   assert.match(patch, /name:\s*dsh-alibaba-mcp/)
