@@ -24,9 +24,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-          cache: npm
           registry-url: 'https://registry.npmjs.org'
-      - run: npm ci --ignore-scripts
+      - name: Install dependencies
+        run: npm install --no-save --ignore-scripts
       - name: Verify tag matches package version
         if: startsWith(github.ref, 'refs/tags/')
         run: |
@@ -38,6 +38,8 @@ jobs:
           fi
       - run: npm test
       - run: npm run check
+      - run: npm run build
+      - run: git diff --exit-code -- lib/client.js
       - name: Pack the installable tarball
         run: npm pack
       - name: Create the GitHub release
@@ -45,9 +47,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           VERSION="$(node -p "require('./package.json').version")"
+          RELEASE_TAG="v$VERSION"
           FLAGS=()
           case "$VERSION" in *-*) FLAGS+=(--prerelease) ;; esac
-          RELEASE_TAG="v$VERSION"
           gh release view "$RELEASE_TAG" >/dev/null 2>&1 || \
             gh release create "$RELEASE_TAG" \
               --title "dsh-alibaba-mcp $RELEASE_TAG" \
