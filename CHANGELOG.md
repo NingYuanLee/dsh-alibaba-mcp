@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.2
+
+- Widen `engines.dsh` to `>=0.2.1-rc.2 <0.3.0-0 || >=0.2.2-0 <0.3.0-0` so the declared host range admits the DSH 0.2.2 pre-release line this plugin is verified on. The previous single-clause range excluded 0.2.2 pre-releases even though the peer ranges already accepted them.
+- Unify the README badge row (npm, MIT license, Node, DSH range, `dsh-plugin` topic, powered by dsh) and sync the compatibility table with the declared range.
+
 ## 0.3.1
 
 - Support DeepSeek Harness 0.2.x pre-releases: widen the `@deepseek-ai/cordis` peer range to `>=4.0.4 <5.0.0` and `@deepseek-ai/schemastery` to `>=3.18.4 <4.0.0`, and accept the `0.2.1` and `0.2.2-0`-and-later DSH peer ranges side by side. No runtime code changes: the MCP bridge, credentials, and cordis lifecycle APIs this plugin uses are unchanged in 0.2.2. Loading and the full test suite were re-verified against DSH 0.2.2-rc.1.

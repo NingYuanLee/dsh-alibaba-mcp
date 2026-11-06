@@ -1,7 +1,6 @@
 # dsh-alibaba-mcp
 
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![dsh](https://img.shields.io/badge/dsh-%3E%3D0.2.1--rc.2%20%3C0.3.0--0-6f42c1)](package.json)
+[![npm](https://img.shields.io/npm/v/dsh-alibaba-mcp.svg)](https://www.npmjs.com/package/dsh-alibaba-mcp) [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE) [![Node >=22.19](https://img.shields.io/badge/node-%3E%3D22.19.0-339933.svg)](#compatibility) [![dsh](https://img.shields.io/badge/dsh-%3E%3D0.2.1--rc.2%20%3C0.3.0--0%20%7C%7C%20%3E%3D0.2.2--0%20%3C0.3.0--0-6f42c1)](#compatibility) [![topic: dsh-plugin](https://img.shields.io/badge/topic-dsh--plugin-6f42c1.svg)](https://github.com/topics/dsh-plugin) [![powered by dsh](https://img.shields.io/badge/powered_by-dsh-4D6BFE?style=flat-square&logo=deepseek&logoColor=white)](https://github.com/deepseek-ai/deepseek-harness)
 
 > [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 的第三方插件，不是 DeepSeek 或阿里云的官方产品。MIT。
 
@@ -113,8 +112,9 @@ Cordis 行 id 是 `alibaba-mcp`。包名是 `dsh-alibaba-mcp`。
 
 | 项 | 值 |
 |---|---|
-| dsh | `>=0.2.1-rc.2 <0.3.0-0` |
+| dsh | `>=0.2.1-rc.2 <0.3.0-0 \|\| >=0.2.2-0 <0.3.0-0` |
 | Node | `>=22.19.0` |
+| 已验证 | dsh `0.2.2-rc.1` |
 | 服务器 | `D:\tools\mcp\vendor\alibaba` 里的 `alibaba-cloud-ops-mcp-server` 0.9.27 |
 | 依赖 | `credentials`、`tools`，以及自带的 `@deepseek-ai/dsh-mcp-client` |
 

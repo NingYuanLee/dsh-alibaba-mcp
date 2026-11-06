@@ -23,7 +23,7 @@ test('declares an installable bundle', () => {
 })
 
 test('declares the verified dsh and node ranges and peer baselines', () => {
-  assert.equal(pkg.engines?.dsh, '>=0.2.1-rc.2 <0.3.0-0')
+  assert.equal(pkg.engines?.dsh, '>=0.2.1-rc.2 <0.3.0-0 || >=0.2.2-0 <0.3.0-0')
   assert.equal(pkg.engines?.node, '>=22.19.0')
   assert.equal(pkg.peerDependencies?.['@deepseek-ai/cordis'], '>=4.0.4 <5.0.0')
   assert.equal(pkg.peerDependencies?.['@deepseek-ai/dsh-credentials'], '>=0.2.1-0 <0.3.0-0 || >=0.2.2-0 <0.3.0-0')
