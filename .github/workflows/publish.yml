@@ -1,0 +1,73 @@
+name: Publish
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+# npm trusted publishing (OIDC).
+# - `id-token: write` lets the runner request the short-lived OIDC token that
+#   npm exchanges for a publish token; it is the only permission trusted
+#   publishing needs and it is why no npm token is configured anywhere.
+# - `contents: write` stays for creating the GitHub Release and uploading the
+#   packed tarball.
+permissions:
+  id-token: write
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          registry-url: 'https://registry.npmjs.org'
+      - run: npm ci --ignore-scripts
+      - name: Verify tag matches package version
+        run: |
+          VERSION="$(node -p "require('./package.json').version")"
+          TAG="${GITHUB_REF_NAME#v}"
+          if [ "$VERSION" != "$TAG" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match package.json version $VERSION" >&2
+            exit 1
+          fi
+      - run: npm test
+      - run: npm run check
+      - name: Pack the installable tarball
+        run: npm pack
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="$(node -p "require('./package.json').version")"
+          FLAGS=()
+          case "$VERSION" in *-*) FLAGS+=(--prerelease) ;; esac
+          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || \
+            gh release create "$GITHUB_REF_NAME" \
+              --title "dsh-alibaba-mcp $GITHUB_REF_NAME" \
+              --generate-notes \
+              "${FLAGS[@]}"
+          gh release upload "$GITHUB_REF_NAME" "dsh-alibaba-mcp-$VERSION.tgz" --clobber
+      - name: Publish to npm
+        # Trusted publishing (OIDC): the npm CLI picks up the OIDC token that
+        # GitHub mints for this workflow and exchanges it for a publish token.
+        # No npm token is stored in the repository.
+        #
+        # Prerequisite (register once per package on npmjs.com,
+        # Packages -> dsh-alibaba-mcp -> Settings -> Trusted publishing):
+        #   Organization or user: NingYuanLee
+        #   Repository:           dsh-alibaba-mcp
+        #   Workflow filename:    publish.yml   (file name only, matching
+        #                         .github/workflows/publish.yml exactly, case
+        #                         included)
+        #   Environment name:     leave empty
+        #
+        # The same relationship can be registered from the command line
+        # (npm 11.16 or newer, after `npm login`):
+        #   npm trust github dsh-alibaba-mcp --file publish.yml \
+        #     --repo NingYuanLee/dsh-alibaba-mcp --allow-publish
+        run: npm publish
